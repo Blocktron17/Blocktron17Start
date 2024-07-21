@@ -1,0 +1,379 @@
+<html><head><base href="https://websim.ai" />
+<title>WebSim Code Editor with HTML Preview and Save Feature</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.4.12/ace.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.4.12/ext-language_tools.js"></script>
+<style>
+  body, html {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    transition: background-color 0.3s, color 0.3s;
+  }
+  body.light-theme {
+    background-color: #f4f4f4;
+    color: #333333;
+  }
+  body.dark-theme {
+    background-color: #1e1e1e;
+    color: #d4d4d4;
+  }
+  .editor-container {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+  }
+  .toolbar {
+    padding: 10px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: background-color 0.3s;
+  }
+  .light-theme .toolbar {
+    background-color: #e0e0e0;
+  }
+  .dark-theme .toolbar {
+    background-color: #333333;
+  }
+  .language-select, .toggle-theme, .preview-html, .save-code {
+    padding: 5px;
+    font-size: 14px;
+    transition: background-color 0.3s, color 0.3s, border-color 0.3s;
+    margin-right: 5px;
+  }
+  .light-theme .language-select, .light-theme .toggle-theme, .light-theme .preview-html, .light-theme .save-code {
+    background-color: #ffffff;
+    color: #333333;
+    border: 1px solid #cccccc;
+  }
+  .dark-theme .language-select, .dark-theme .toggle-theme, .dark-theme .preview-html, .dark-theme .save-code {
+    background-color: #252526;
+    color: #d4d4d4;
+    border: 1px solid #3c3c3c;
+  }
+  #editor {
+    flex-grow: 1;
+    transition: background-color 0.3s;
+  }
+  .light-theme #editor {
+    background-color: #ffffff;
+  }
+  .dark-theme #editor {
+    background-color: #1e1e1e;
+  }
+  #error-panel {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background-color: #f0f0f0;
+    border-top: 1px solid #ccc;
+    padding: 10px;
+    max-height: 30%;
+    overflow-y: auto;
+    transition: background-color 0.3s;
+  }
+  .dark-theme #error-panel {
+    background-color: #2d2d2d;
+    border-color: #3c3c3c;
+  }
+  .debug-info {
+    color: #0077be;
+    margin-bottom: 5px;
+  }
+  .debug-error {
+    color: #ff4444;
+    margin-bottom: 5px;
+  }
+  .debug-warning {
+    color: #ffaa00;
+    margin-bottom: 5px;
+  }
+  #html-preview-window {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 80%;
+    max-width: 800px;
+    height: 80%;
+    max-height: 600px;
+    background-color: #ffffff;
+    border: 1px solid #ccc;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    display: none;
+    flex-direction: column;
+    z-index: 1000;
+    transition: all 0.3s ease;
+  }
+  #html-preview-window.fullscreen {
+    width: 100%;
+    height: 100%;
+    max-width: 100%;
+    max-height: 100%;
+  }
+  .dark-theme #html-preview-window {
+    background-color: #2d2d2d;
+    border-color: #3c3c3c;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+  }
+  #html-preview-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px;
+    background-color: #e0e0e0;
+    border-bottom: 1px solid #ccc;
+  }
+  .dark-theme #html-preview-header {
+    background-color: #3c3c3c;
+    border-color: #555;
+  }
+  #html-preview-title {
+    font-weight: bold;
+  }
+  #close-html-preview, #fullscreen-html-preview {
+    background: none;
+    border: none;
+    font-size: 18px;
+    cursor: pointer;
+    margin-left: 10px;
+  }
+  #html-preview-content {
+    flex-grow: 1;
+    border: none;
+    width: 100%;
+    height: 100%;
+  }
+</style>
+</head>
+<body>
+  <div class="editor-container">
+    <div class="toolbar">
+      <select id="language-select" class="language-select">
+        <option value="html">HTML</option>
+        <option value="python">Python</option>
+        <option value="c_cpp">C++</option>
+        <option value="java">Java</option>
+      </select>
+      <div>
+        <button id="toggle-theme" class="toggle-theme">Toggle Theme</button>
+        <button id="preview-html" class="preview-html" style="display: none;">Preview HTML</button>
+        <button id="save-code" class="save-code">Save Code</button>
+      </div>
+    </div>
+    <div id="editor"></div>
+  </div>
+
+  <div id="error-panel"></div>
+
+  <div id="html-preview-window">
+    <div id="html-preview-header">
+      <span id="html-preview-title">HTML Preview</span>
+      <div>
+        <button id="fullscreen-html-preview">&#x26F6;</button>
+        <button id="close-html-preview">&times;</button>
+      </div>
+    </div>
+    <iframe id="html-preview-content"></iframe>
+  </div>
+
+  <script>
+    const editor = ace.edit("editor");
+    editor.setTheme("ace/theme/monokai");
+    editor.session.setMode("ace/mode/html");
+    editor.setFontSize(14);
+    editor.setOptions({
+      enableBasicAutocompletion: true,
+      enableLiveAutocompletion: true,
+      enableSnippets: true
+    });
+
+    const languageSelect = document.getElementById('language-select');
+    const toggleThemeButton = document.getElementById('toggle-theme');
+    const errorPanel = document.getElementById('error-panel');
+    const previewHtmlButton = document.getElementById('preview-html');
+    const htmlPreviewWindow = document.getElementById('html-preview-window');
+    const closeHtmlPreviewButton = document.getElementById('close-html-preview');
+    const fullscreenHtmlPreviewButton = document.getElementById('fullscreen-html-preview');
+    const htmlPreviewContent = document.getElementById('html-preview-content');
+    const saveCodeButton = document.getElementById('save-code');
+
+    const defaultCode = {
+      html: `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hello World</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f0f0f0;
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <h1>Hello, World!</h1>
+</body>
+</html>
+      `,
+      python: `
+# Python code example
+def greet(name):
+    return f"Hello, {name}!"
+
+print(greet("World"))
+      `,
+      c_cpp: `
+// C++ code example
+#include <iostream>
+#include <string>
+
+std::string greet(const std::string& name) {
+    return "Hello, " + name + "!";
+}
+
+int main() {
+    std::cout << greet("World") << std::endl;
+    return 0;
+}
+      `,
+      java: `
+// Java code example
+public class Greeter {
+    public static String greet(String name) {
+        return "Hello, " + name + "!";
+    }
+
+    public static void main(String[] args) {
+        System.out.println(greet("World"));
+    }
+}
+      `
+    };
+
+    languageSelect.addEventListener('change', (e) => {
+      const language = e.target.value;
+      editor.session.setMode(`ace/mode/${language}`);
+      editor.setValue(defaultCode[language]);
+      editor.clearSelection();
+      previewHtmlButton.style.display = language === 'html' ? 'inline-block' : 'none';
+    });
+
+    function setTheme(isDark) {
+      document.body.className = isDark ? 'dark-theme' : 'light-theme';
+      editor.setTheme(isDark ? "ace/theme/monokai" : "ace/theme/chrome");
+      document.cookie = `theme=${isDark ? 'dark' : 'light'}; expires=Fri, 31 Dec 9999 23:59:59 GMT; path=/`;
+      
+      const editorElement = document.querySelector('.ace_editor');
+      if (editorElement) {
+        editorElement.style.backgroundColor = isDark ? '#1e1e1e' : '#ffffff';
+      }
+      
+      const gutterElement = document.querySelector('.ace_gutter');
+      if (gutterElement) {
+        gutterElement.style.backgroundColor = isDark ? '#1e1e1e' : '#f0f0f0';
+      }
+    }
+
+    function getThemeFromCookie() {
+      const cookies = document.cookie.split(';');
+      for (let cookie of cookies) {
+        const [name, value] = cookie.trim().split('=');
+        if (name === 'theme') {
+          return value;
+        }
+      }
+      return null;
+    }
+
+    toggleThemeButton.addEventListener('click', () => {
+      const isDark = document.body.className === 'light-theme';
+      setTheme(isDark);
+    });
+
+    previewHtmlButton.addEventListener('click', () => {
+      htmlPreviewWindow.style.display = 'flex';
+      previewHtml();
+    });
+
+    closeHtmlPreviewButton.addEventListener('click', () => {
+      htmlPreviewWindow.style.display = 'none';
+    });
+
+    fullscreenHtmlPreviewButton.addEventListener('click', () => {
+      htmlPreviewWindow.classList.toggle('fullscreen');
+    });
+
+    saveCodeButton.addEventListener('click', () => {
+      const code = editor.getValue();
+      const blob = new Blob([code], {type: 'text/plain'});
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'code.htkl';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    });
+
+    function previewHtml() {
+      const htmlCode = editor.getValue();
+      const previewDocument = htmlPreviewContent.contentDocument;
+      previewDocument.open();
+      previewDocument.write(htmlCode);
+      previewDocument.close();
+    }
+
+    // Real-time error scanning
+    editor.getSession().on('change', () => {
+      const annotations = editor.getSession().getAnnotations();
+      errorPanel.innerHTML = '';
+      
+      if (annotations.length > 0) {
+        annotations.forEach(annotation => {
+          const errorElement = document.createElement('div');
+          errorElement.className = annotation.type === 'error' ? 'debug-error' : 'debug-warning';
+          errorElement.textContent = `${annotation.type} on line ${annotation.row + 1}: ${annotation.text}`;
+          errorPanel.appendChild(errorElement);
+        });
+        errorPanel.style.display = 'block';
+      } else {
+        errorPanel.style.display = 'none';
+      }
+    });
+
+    // Set initial theme based on cookie or default to dark
+    const savedTheme = getThemeFromCookie();
+    setTheme(savedTheme === 'light' ? false : true);
+
+    // Set initial code
+    editor.setValue(defaultCode.html);
+    editor.clearSelection();
+
+    // Handle window resize
+    function handleResize() {
+      editor.resize();
+    }
+
+    window.addEventListener('resize', handleResize);
+    handleResize(); // Initial call to set correct layout
+
+    // Initialize error panel
+    errorPanel.style.display = 'none';
+
+    // Show preview HTML button initially
+    previewHtmlButton.style.display = 'inline-block';
+  </script>
+</body></html>
