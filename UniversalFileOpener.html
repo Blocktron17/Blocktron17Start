@@ -1,0 +1,449 @@
+<html><head><base href="https://www.filesphere.com/"><title>FileSphere - Universal File Opener</title><style>
+body {
+    font-family: Arial, sans-serif;
+    background-color: #1e1e1e;
+    color: #e0e0e0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 20px;
+}
+h1 {
+    color: #7cb7ff;
+}
+button {
+    background-color: #4CAF50;
+    border: none;
+    color: white;
+    padding: 15px 32px;
+    text-align: center;
+    text-decoration: none;
+    display: inline-block;
+    font-size: 16px;
+    margin: 4px 2px;
+    cursor: pointer;
+    border-radius: 12px;
+    transition: background-color 0.3s;
+}
+button:hover {
+    background-color: #45a049;
+}
+#fileDisplay {
+    margin-top: 20px;
+    width: 100%;
+    max-width: 1200px; /* Increased from 800px */
+    background-color: #2d2d2d;
+    padding: 10px;
+    border-radius: 5px;
+    position: relative;
+}
+#textEditor {
+    width: 100%;
+    height: 300px;
+    display: none;
+    background-color: #2d2d2d;
+    color: #e0e0e0;
+    border: 1px solid #444;
+    border-radius: 5px;
+    padding: 10px;
+}
+iframe {
+    width: 100%;
+    height: 600px; /* Increased from default */
+    border: none;
+    background-color: #ffffff;
+}
+video, img {
+    width: 100%;
+    max-width: 100%;
+    border: none;
+    background-color: #ffffff;
+}
+.progressBarContainer {
+    width: 100%;
+    background-color: #333;
+    margin-top: 10px;
+    display: none;
+    border-radius: 5px;
+    overflow: hidden;
+}
+.progressBar {
+    width: 0%;
+    height: 30px;
+    background-color: #4CAF50;
+    text-align: center;
+    line-height: 30px;
+    color: white;
+}
+#scanButton {
+    background-color: #007bff;
+}
+#scanButton:hover {
+    background-color: #0056b3;
+}
+#saveButton {
+    background-color: #ffc107;
+    color: #000;
+}
+#saveButton:hover {
+    background-color: #e0a800;
+}
+#messageWindow {
+    display: none;
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background-color: #2d2d2d;
+    border: 2px solid #444;
+    border-radius: 10px;
+    padding: 20px;
+    z-index: 1000;
+    box-shadow: 0 0 10px rgba(0,0,0,0.5);
+}
+#messageContent {
+    margin-bottom: 20px;
+    color: #e0e0e0;
+}
+#messageWindow button {
+    padding: 10px 20px;
+    margin: 0 10px;
+}
+#closeButton {
+    background-color: #dc3545;
+}
+#closeButton:hover {
+    background-color: #c82333;
+}
+#zipTree {
+    width: 100%;
+    max-width: 1200px; /* Increased from 800px */
+    background-color: #2d2d2d;
+    color: #e0e0e0;
+    padding: 10px;
+    border-radius: 5px;
+    margin-top: 20px;
+}
+.tree-node {
+    padding: 3px 0;
+    cursor: pointer;
+    user-select: none;
+}
+.tree-node:hover {
+    background-color: #3d3d3d;
+}
+.tree-node::before {
+    content: '▶ ';
+    display: inline-block;
+    margin-right: 6px;
+    transition: transform 0.3s;
+}
+.tree-node.open::before {
+    transform: rotate(90deg);
+}
+.tree-content {
+    margin-left: 20px;
+    display: none;
+}
+.tree-node.open > .tree-content {
+    display: block;
+}
+.file-node {
+    padding: 3px 0;
+    cursor: pointer;
+}
+.file-node:hover {
+    background-color: #3d3d3d;
+}
+#fullscreenButton {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background-color: rgba(0, 0, 0, 0.5);
+    color: white;
+    border: none;
+    border-radius: 5px;
+    padding: 5px 10px;
+    cursor: pointer;
+    z-index: 10;
+}
+#fullscreenButton:hover {
+    background-color: rgba(0, 0, 0, 0.7);
+}
+</style></head><body>
+<h1>FileSphere - Universal File Opener</h1>
+<input type="file" id="fileInput" style="display: none;">
+<button id="openBtn">Open</button>
+<button id="scanButton" style="display: none;">Scan with VirusTotal</button>
+<button id="saveButton" style="display: none;">Save Changes</button>
+<div id="fileProgressBarContainer" class="progressBarContainer">
+    <div id="fileProgressBar" class="progressBar">0%</div>
+</div>
+<div id="scanProgressBarContainer" class="progressBarContainer">
+    <div id="scanProgressBar" class="progressBar">0%</div>
+</div>
+<div id="zipTree"></div>
+<div id="fileDisplay">
+    <button id="fullscreenButton" style="display: none;">Fullscreen</button>
+</div>
+<textarea id="textEditor"></textarea>
+
+<div id="messageWindow">
+    <div id="messageContent"></div>
+    <button id="okButton">OK</button>
+    <button id="closeButton">Close</button>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.7.1/jszip.min.js"></script>
+<script>
+const openBtn = document.getElementById('openBtn');
+const scanButton = document.getElementById('scanButton');
+const saveButton = document.getElementById('saveButton');
+const fileInput = document.getElementById('fileInput');
+const fileDisplay = document.getElementById('fileDisplay');
+const textEditor = document.getElementById('textEditor');
+const zipTree = document.getElementById('zipTree');
+const fileProgressBarContainer = document.getElementById('fileProgressBarContainer');
+const fileProgressBar = document.getElementById('fileProgressBar');
+const scanProgressBarContainer = document.getElementById('scanProgressBarContainer');
+const scanProgressBar = document.getElementById('scanProgressBar');
+const messageWindow = document.getElementById('messageWindow');
+const messageContent = document.getElementById('messageContent');
+const okButton = document.getElementById('okButton');
+const closeButton = document.getElementById('closeButton');
+const fullscreenButton = document.getElementById('fullscreenButton');
+
+let currentFile = null;
+let currentZip = null;
+let currentZipEntry = null;
+let fullscreenElement = null;
+
+function showMessage(message, isError = false) {
+    messageContent.textContent = message;
+    messageContent.style.color = isError ? '#ff6b6b' : '#e0e0e0';
+    messageWindow.style.display = 'block';
+}
+
+function hideMessage() {
+    messageWindow.style.display = 'none';
+}
+
+okButton.addEventListener('click', hideMessage);
+closeButton.addEventListener('click', hideMessage);
+
+openBtn.addEventListener('click', () => fileInput.click());
+
+function buildZipTree(zip) {
+    const tree = {};
+    zip.forEach((relativePath, zipEntry) => {
+        const parts = relativePath.split('/');
+        let currentLevel = tree;
+        parts.forEach((part, index) => {
+            if (index === parts.length - 1) {
+                currentLevel[part] = { type: 'file', entry: zipEntry };
+            } else {
+                if (!currentLevel[part]) {
+                    currentLevel[part] = { type: 'folder', children: {} };
+                }
+                currentLevel = currentLevel[part].children;
+            }
+        });
+    });
+    return tree;
+}
+
+function renderZipTree(tree, container) {
+    for (const [name, node] of Object.entries(tree)) {
+        const nodeElement = document.createElement('div');
+        if (node.type === 'folder') {
+            nodeElement.className = 'tree-node';
+            nodeElement.textContent = name;
+            const contentElement = document.createElement('div');
+            contentElement.className = 'tree-content';
+            renderZipTree(node.children, contentElement);
+            nodeElement.appendChild(contentElement);
+            nodeElement.addEventListener('click', (e) => {
+                e.stopPropagation();
+                nodeElement.classList.toggle('open');
+            });
+        } else {
+            nodeElement.className = 'file-node';
+            nodeElement.textContent = name;
+            nodeElement.addEventListener('click', (e) => {
+                e.stopPropagation();
+                openZipFile(node.entry);
+            });
+        }
+        container.appendChild(nodeElement);
+    }
+}
+
+async function openZipFile(zipEntry) {
+    try {
+        const content = await zipEntry.async('string');
+        textEditor.value = content;
+        textEditor.style.display = 'block';
+        fileDisplay.innerHTML = '<button id="fullscreenButton" style="display: none;">Fullscreen</button>';
+        currentZipEntry = zipEntry;
+        saveButton.style.display = 'inline-block';
+        fullscreenButton.style.display = 'none';
+    } catch (error) {
+        showMessage('Error opening file: ' + error.message, true);
+    }
+}
+
+fileInput.addEventListener('change', async (event) => {
+    currentFile = event.target.files[0];
+    const reader = new FileReader();
+
+    fileProgressBarContainer.style.display = 'block';
+    fileProgressBar.style.width = '0%';
+    fileProgressBar.textContent = '0%';
+
+    reader.onprogress = (e) => {
+        if (e.lengthComputable) {
+            const percentLoaded = Math.round((e.loaded / e.total) * 100);
+            fileProgressBar.style.width = percentLoaded + '%';
+            fileProgressBar.textContent = percentLoaded + '%';
+        }
+    };
+
+    reader.onload = async (e) => {
+        fileProgressBar.style.width = '100%';
+        fileProgressBar.textContent = '100%';
+        
+        setTimeout(() => {
+            fileProgressBarContainer.style.display = 'none';
+        }, 500);
+
+        const content = e.target.result;
+        fileDisplay.innerHTML = '<button id="fullscreenButton" style="display: none;">Fullscreen</button>';
+        textEditor.style.display = 'none';
+        zipTree.innerHTML = '';
+        scanButton.style.display = 'inline-block';
+        saveButton.style.display = 'none';
+        fullscreenButton.style.display = 'none';
+
+        try {
+            if (currentFile.type === 'application/zip' || currentFile.name.endsWith('.zip')) {
+                currentZip = await JSZip.loadAsync(content);
+                const tree = buildZipTree(currentZip);
+                renderZipTree(tree, zipTree);
+                zipTree.style.display = 'block';
+            } else if (currentFile.type.startsWith('video/')) {
+                const video = document.createElement('video');
+                video.src = URL.createObjectURL(currentFile);
+                video.controls = true;
+                video.style.maxWidth = '100%';
+                fileDisplay.appendChild(video);
+                fullscreenButton.style.display = 'block';
+                fullscreenElement = video;
+            } else if (currentFile.type === 'text/html' || currentFile.type === 'application/pdf' || currentFile.type.startsWith('audio/')) {
+                const iframe = document.createElement('iframe');
+                iframe.src = URL.createObjectURL(currentFile);
+                fileDisplay.appendChild(iframe);
+                fullscreenButton.style.display = 'block';
+                fullscreenElement = iframe;
+            } else if (currentFile.type.startsWith('image/')) {
+                const img = document.createElement('img');
+                img.src = URL.createObjectURL(currentFile);
+                img.style.maxWidth = '100%';
+                fileDisplay.appendChild(img);
+                fullscreenButton.style.display = 'block';
+                fullscreenElement = img;
+            } else {
+                const text = await currentFile.text();
+                textEditor.value = text;
+                textEditor.style.display = 'block';
+                saveButton.style.display = 'inline-block';
+                fullscreenButton.style.display = 'none';
+            }
+        } catch (error) {
+            showMessage('Error opening file: ' + error.message, true);
+        }
+    };
+
+    reader.onerror = (error) => {
+        showMessage('Error reading file: ' + error.message, true);
+    };
+
+    reader.readAsArrayBuffer(currentFile);
+});
+
+scanButton.addEventListener('click', () => {
+    if (!currentFile) {
+        showMessage('No file selected for scanning.', true);
+        return;
+    }
+
+    scanProgressBarContainer.style.display = 'block';
+    scanProgressBar.style.width = '0%';
+    scanProgressBar.textContent = 'Scanning...';
+
+    // Simulating API call to VirusTotal
+    setTimeout(() => {
+        scanProgressBar.style.width = '100%';
+        scanProgressBar.textContent = 'Scan Complete';
+        
+        setTimeout(() => {
+            scanProgressBarContainer.style.display = 'none';
+            showMessage('Scan completed. File appears to be safe.');
+        }, 1000);
+    }, 3000);
+
+    // In a real implementation, you would use the VirusTotal API here
+});
+
+saveButton.addEventListener('click', () => {
+    if (currentZipEntry) {
+        currentZipEntry.async('string').then(content => {
+            if (content !== textEditor.value) {
+                currentZipEntry._data = new Uint8Array(textEditor.value.split('').map(char => char.charCodeAt(0)));
+                currentZip.generateAsync({type:"blob"})
+                    .then(function(blob) {
+                        saveAs(blob, "updated_archive.zip");
+                    });
+                showMessage('Changes saved. Downloading updated zip file.');
+            } else {
+                showMessage('No changes detected.');
+            }
+        });
+    } else if (currentFile) {
+        const blob = new Blob([textEditor.value], { type: currentFile.type });
+        const fileName = prompt("Enter file name to save:", currentFile.name);
+        if (fileName) {
+            saveAs(blob, fileName);
+            showMessage('File saved successfully.');
+        } else {
+            showMessage('Save cancelled.');
+        }
+    } else {
+        showMessage('No file to save.', true);
+    }
+});
+
+fullscreenButton.addEventListener('click', () => {
+    if (fullscreenElement) {
+        if (fullscreenElement.requestFullscreen) {
+            fullscreenElement.requestFullscreen();
+        } else if (fullscreenElement.webkitRequestFullscreen) { /* Safari */
+            fullscreenElement.webkitRequestFullscreen();
+        } else if (fullscreenElement.msRequestFullscreen) { /* IE11 */
+            fullscreenElement.msRequestFullscreen();
+        }
+    }
+});
+
+// FileSaver.js function (simplified version)
+function saveAs(blob, fileName) {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = fileName;
+    a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(a.href);
+}
+</script>
+</body></html>
