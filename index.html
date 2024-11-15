@@ -411,23 +411,7 @@
         if (!httpsSupported) {
           showHttpsWarningModal(url);
         } else {
-          const iframe = document.createElement('iframe');
-          iframe.style.display = 'none';
-          document.body.appendChild(iframe);
-          
-          iframe.onload = () => {
-            stopLoadingBar();
-            document.body.removeChild(iframe);
-            window.location.href = url;
-          };
 
-          iframe.onerror = (error) => {
-            stopLoadingBar();
-            document.body.removeChild(iframe);
-            showErrorModal(error);
-          };
-
-          iframe.src = url;
         }
       } catch (error) {
         if (error.name === 'AbortError') {
